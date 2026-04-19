@@ -1,0 +1,13 @@
+.git
+.gitignore
+README.md
+.github/
+.env
+.env.*
+nginx/ssl/*.pem
+nginx/ssl/*.key
+scripts/*.sql
+scripts/*.gz
+node_modules/
+.vscode/
+.idea/

@@ -1,0 +1,37 @@
+# Environnement
+.env
+.env.local
+.env.*.local
+
+# Docker
+*.pid
+*.log
+docker-compose.override.yml
+
+# SSL (ne pas versionner les vrais certificats)
+nginx/ssl/*.pem
+nginx/ssl/*.crt
+nginx/ssl/*.key
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Scripts générés
+scripts/*.log
+
+# Backups
+backups/
+*.sql
+*.sql.gz
+*.tar.gz
+
+# Node (si jamais)
+node_modules/
