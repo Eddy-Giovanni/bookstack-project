@@ -13,7 +13,7 @@ New-Item -ItemType Directory -Path $TEMP_DIR -Force | Out-Null
 
 # Backup PostgreSQL
 Write-Host " Backup de la base de données..." -ForegroundColor Yellow
-docker exec bookstack-db pg_dump -U bookstack_user -d bookstack -F c > "$TEMP_DIR\database.dump"
+docker exec bookstack-db pg_dump -U postgres -d bookstack -F c > "$TEMP_DIR\database.dump"
 Write-Host " Base de données sauvegardée" -ForegroundColor Green
 
 # Backup des volumes

@@ -46,7 +46,7 @@ shell:
 	docker-compose exec app sh
 
 psql:
-	docker-compose exec database psql -U bookstack_user -d bookstack
+	docker-compose exec database psql -U postgres -d bookstack
 
 test:
 	curl -k https://localhost

@@ -2,7 +2,7 @@
 FROM lscr.io/linuxserver/bookstack:latest
 
 # Étape 2 : Définir les labels (métadonnées)
-LABEL maintainer="votre-email@example.com"
+LABEL maintainer="fomekongnguetsa@gmail.com@example.com"
 LABEL version="1.0"
 LABEL description="BookStack personnalisé pour TP11"
 

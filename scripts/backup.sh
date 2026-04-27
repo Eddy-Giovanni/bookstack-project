@@ -13,7 +13,7 @@ TEMP_DIR="/tmp/${BACKUP_NAME}"
 S3_BUCKET="bookstack-backups"
 DB_CONTAINER="bookstack-db"
 DB_NAME="bookstack"
-DB_USER="bookstack_user"
+DB_USER="postgres"
 
 echo "========================================="
 echo "BookStack Backup Script - ${DATE}"

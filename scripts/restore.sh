@@ -47,7 +47,7 @@ echo " Services arrêtés"
 echo " Restauration de la base de données..."
 docker-compose up -d database
 sleep 10
-docker exec -i bookstack-db pg_restore -U bookstack_user -d bookstack -c < ${TEMP_DIR}/bookstack_backup_*/database.dump
+docker exec -i bookstack-db pg_restore -U postgres -d bookstack -c < ${TEMP_DIR}/bookstack_backup_*/database.dump
 echo " Base de données restaurée"
 
 # 6. Restaurer les uploads

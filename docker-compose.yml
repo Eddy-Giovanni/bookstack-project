@@ -35,16 +35,16 @@ services:
     container_name: bookstack-db
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${DB_DATABASE:-bookstack}
-      POSTGRES_USER: ${DB_USERNAME:-bookstack_user}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-bookstack_password_123}
+      POSTGRES_DB: ${DB_DATABASE}
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./scripts/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     networks:
       - backend
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-bookstack_user} -d ${DB_DATABASE:-bookstack}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME} -d ${DB_DATABASE}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -66,17 +66,26 @@ services:
     restart: unless-stopped
     environment:
       # Application
-      APP_URL: ${APP_URL:-http://localhost}
-      APP_LANG: ${APP_LANG:-fr}
-      APP_DEBUG: ${APP_DEBUG:-false}
+      APP_URL: ${APP_URL}
+      APP_LANG: ${APP_LANG}
+      APP_DEBUG: ${APP_DEBUG}
       # Base de données
-      DB_HOST: database
-      DB_PORT: 5432
-      DB_DATABASE: ${DB_DATABASE:-bookstack}
-      DB_USERNAME: ${DB_USERNAME:-bookstack_user}
-      DB_PASSWORD: ${DB_PASSWORD:-bookstack_password_123}
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT}
+      DB_DATABASE: ${DB_DATABASE}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
       # Sécurité
       APP_KEY: ${APP_KEY}
+      # Email
+      MAIL_DRIVER: ${MAIL_DRIVER}
+      MAIL_HOST: ${MAIL_HOST}
+      MAIL_PORT: ${MAIL_PORT}
+      MAIL_USERNAME: ${MAIL_USERNAME}
+      MAIL_PASSWORD: ${MAIL_PASSWORD}
+      MAIL_ENCRYPTION: ${MAIL_ENCRYPTION}
+      MAIL_FROM_NAME: ${MAIL_FROM_NAME}
+      MAIL_FROM_ADDRESS: ${MAIL_FROM_ADDRESS}
     volumes:
       - bookstack_uploads:/config/www/uploads
       - bookstack_storage:/config/www/storage
@@ -172,7 +181,7 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_SECURITY_ADMIN_PASSWORD=${GF_ADMIN_PASSWORD}
     volumes:
       - grafana_data:/var/lib/grafana
     networks:
