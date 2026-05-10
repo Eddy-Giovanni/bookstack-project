@@ -26,20 +26,42 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: Verify AWS credentials
+        run: |
+          echo "Testing AWS credentials..."
+          aws sts get-caller-identity
+
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
+      - name: Verify ECR repository exists
+        run: |
+          echo "Checking if ECR repository exists..."
+          aws ecr describe-repositories --repository-names ${{ env.ECR_REPOSITORY }} --region ${{ env.AWS_REGION }} || \
+          (echo "Repository does not exist, creating..." && \
+           aws ecr create-repository --repository-name ${{ env.ECR_REPOSITORY }} --region ${{ env.AWS_REGION }})
+
       - name: Build Docker image
         run: |
+          echo "Building Docker image..."
           docker build -f docker/Dockerfile -t ${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }} .
+          echo "ECR Registry: ${{ secrets.ECR_REGISTRY }}"
+          echo "ECR Repository: ${{ env.ECR_REPOSITORY }}"
+          echo "Full image URI: ${{ secrets.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}"
           docker tag ${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }} ${{ secrets.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
           docker tag ${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }} ${{ secrets.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:latest
 
       - name: Push to ECR
         run: |
+          echo "Pushing image with tag ${{ env.IMAGE_TAG }}..."
           docker push ${{ secrets.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
+          echo "Pushing image with tag latest..."
           docker push ${{ secrets.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:latest
 
       - name: Image digest
-        run: echo "Image pushed with tag ${{ env.IMAGE_TAG }}"
+        run: |
+          echo "✅ Image successfully pushed to ECR"
+          echo "Repository: ${{ secrets.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}"
+          echo "Tags: ${{ env.IMAGE_TAG }}, latest"
+
