@@ -2,7 +2,7 @@ name: Build and Push to ECR
 
 on:
   push:
-    branches: [main, master]
+    branches: [master]
   workflow_dispatch:
 
 env:
@@ -45,10 +45,8 @@ jobs:
       - name: Build Docker image
         run: |
           echo "Building Docker image..."
-          docker build -f docker/Dockerfile -t ${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }} .
-          echo "ECR Registry: ${{ secrets.ECR_REGISTRY }}"
-          echo "ECR Repository: ${{ env.ECR_REPOSITORY }}"
-          echo "Full image URI: ${{ secrets.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}"
+          docker build -f docker/Dockerfile.ci -t ${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }} .
+          echo "Tagging image for ECR..."
           docker tag ${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }} ${{ secrets.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
           docker tag ${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }} ${{ secrets.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:latest
 
@@ -61,7 +59,7 @@ jobs:
 
       - name: Image digest
         run: |
-          echo "✅ Image successfully pushed to ECR"
+          echo "Image successfully pushed to ECR"
           echo "Repository: ${{ secrets.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}"
           echo "Tags: ${{ env.IMAGE_TAG }}, latest"
 
