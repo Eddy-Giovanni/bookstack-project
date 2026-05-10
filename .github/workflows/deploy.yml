@@ -43,17 +43,24 @@ jobs:
            aws ecr create-repository --repository-name ${{ env.ECR_REPOSITORY }} --region ${{ env.AWS_REGION }})
 
       - name: Build Docker image
+        env:
+          ECR_REGISTRY: ${{ secrets.ECR_REGISTRY }}
+          FULL_IMAGE_NAME: ${{ secrets.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}
         run: |
           echo "Building Docker image..."
-          echo "Target: ${{ secrets.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}"
-          docker build -f docker/Dockerfile.ci -t ${{ secrets.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }} -t ${{ secrets.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:latest .
+          echo "Registry: ${ECR_REGISTRY}"
+          echo "Repository: ${{ env.ECR_REPOSITORY }}"
+          echo "Image tag: ${{ env.IMAGE_TAG }}"
+          docker build -f docker/Dockerfile.ci -t "${FULL_IMAGE_NAME}:${{ env.IMAGE_TAG }}" -t "${FULL_IMAGE_NAME}:latest" .
 
       - name: Push to ECR
+        env:
+          FULL_IMAGE_NAME: ${{ secrets.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}
         run: |
           echo "Pushing image with tag ${{ env.IMAGE_TAG }}..."
-          docker push ${{ secrets.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
+          docker push "${FULL_IMAGE_NAME}:${{ env.IMAGE_TAG }}"
           echo "Pushing image with tag latest..."
-          docker push ${{ secrets.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:latest
+          docker push "${FULL_IMAGE_NAME}:latest"
 
       - name: Image digest
         run: |
