@@ -45,10 +45,11 @@ jobs:
       - name: Build Docker image
         run: |
           echo "Building Docker image..."
-          docker build -f docker/Dockerfile.ci -t ${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }} .
-          echo "Tagging image for ECR..."
-          docker tag ${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }} ${{ secrets.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
-          docker tag ${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }} ${{ secrets.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:latest
+          echo "Target: ${{ secrets.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}"
+          docker build -f docker/Dockerfile.ci \
+            -t ${{ secrets.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }} \
+            -t ${{ secrets.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:latest \
+            .
 
       - name: Push to ECR
         run: |
