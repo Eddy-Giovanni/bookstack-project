@@ -17,7 +17,7 @@
 | Nom | Exemple | Description |
 |-----|---------|-------------|
 | `AWS_REGION` | `eu-north-1` | Région AWS (défaut dans le workflow : `eu-north-1`) |
-| `ECR_REPOSITORY` | `bookstack-isi4` | Nom du dépôt ECR |
+| `ECR_REPOSITORY` | `bookstack` | Nom du dépôt ECR |
 
 ### Secrets optionnels (déploiement EC2)
 
@@ -42,7 +42,7 @@
 | `AWS_SECRET_ACCESS_KEY` | Variable | Oui | Recommandé | Création de la clé d'accès |
 | `ECR_REGISTRY` | Variable | Non | Non | ECR → View push commands (URI sans nom de repo) |
 | `AWS_DEFAULT_REGION` | Variable | Non | Non | Même région que ECR/RDS (ex. `eu-north-1`) |
-| `ECR_REPOSITORY` | Variable | Non | Non | Nom du repo ECR (ex. `bookstack-isi4`) |
+| `ECR_REPOSITORY` | Variable | Non | Non | Nom du repo ECR (ex. `bookstack`) |
 | `DEPLOY_HOST` | Variable | Non | Oui | Console EC2 → instance → Public IPv4 |
 | `DEPLOY_USER` | Variable | Non | Oui | AMI : `ubuntu` (Ubuntu), `ec2-user` (Amazon Linux) |
 | `DEPLOY_SSH_KEY` | Variable (File) | Oui | Oui | Paire de clés créée pour EC2 (.pem) |

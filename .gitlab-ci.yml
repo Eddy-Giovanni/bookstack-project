@@ -7,7 +7,7 @@
 # OBLIGATOIRES :
 #   AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, ECR_REGISTRY
 # RECOMMANDÉES :
-#   AWS_DEFAULT_REGION (ex. eu-north-1), ECR_REPOSITORY (ex. bookstack-isi4)
+#   AWS_DEFAULT_REGION (ex. eu-north-1), ECR_REPOSITORY (ex. bookstack)
 # OPTIONNELLES (deploy EC2 manuel) :
 #   DEPLOY_HOST, DEPLOY_USER, DEPLOY_SSH_KEY, DEPLOY_PATH
 # =============================================================================
@@ -21,7 +21,7 @@ variables:
   DOCKER_TLS_CERTDIR: "/certs"
   DOCKER_DRIVER: overlay2
   AWS_DEFAULT_REGION: "${AWS_DEFAULT_REGION:-eu-north-1}"
-  ECR_REPOSITORY: "${ECR_REPOSITORY:-bookstack-isi4}"
+  ECR_REPOSITORY: "${ECR_REPOSITORY:-bookstack}"
 
 .docker-job:
   image: docker:27-cli
