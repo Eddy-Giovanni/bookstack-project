@@ -143,11 +143,14 @@ jobs:
     name: Deploy to EC2
     runs-on: ubuntu-latest
     needs: build-and-push
-    if: github.event_name == 'workflow_dispatch' && secrets.DEPLOY_HOST != ''
+    # secrets n'est pas autorisé dans un if au niveau job — uniquement workflow_dispatch ici
+    if: github.event_name == 'workflow_dispatch'
     environment: production
 
     steps:
       - name: Deploy via SSH
+        # secrets est autorisé dans un if au niveau step
+        if: ${{ secrets.DEPLOY_HOST != '' }}
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.DEPLOY_HOST }}
