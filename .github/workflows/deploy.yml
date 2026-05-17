@@ -137,29 +137,38 @@ jobs:
           echo "- \`${{ steps.meta.outputs.image }}:latest\`" >> "$GITHUB_STEP_SUMMARY"
 
   # ---------------------------------------------------------------------------
-  # Déploiement SSH optionnel sur EC2
+  # Déploiement SSH optionnel sur EC2 (uniquement si DEPLOY_HOST est configuré)
+  # GitHub n'autorise pas "secrets" dans les if → on copie les secrets vers env
   # ---------------------------------------------------------------------------
   deploy-ec2:
     name: Deploy to EC2
     runs-on: ubuntu-latest
     needs: build-and-push
-    # secrets n'est pas autorisé dans un if au niveau job — uniquement workflow_dispatch ici
     if: github.event_name == 'workflow_dispatch'
     environment: production
+    env:
+      DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+      DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+      DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+      DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+      ECR_REGISTRY: ${{ secrets.ECR_REGISTRY }}
 
     steps:
+      - name: Déploiement ignoré (DEPLOY_HOST absent)
+        if: env.DEPLOY_HOST == ''
+        run: echo "DEPLOY_HOST non défini dans les secrets — étape de déploiement ignorée."
+
       - name: Deploy via SSH
-        # secrets est autorisé dans un if au niveau step
-        if: ${{ secrets.DEPLOY_HOST != '' }}
+        if: env.DEPLOY_HOST != ''
         uses: appleboy/ssh-action@v1.2.0
         with:
-          host: ${{ secrets.DEPLOY_HOST }}
-          username: ${{ secrets.DEPLOY_USER }}
-          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          host: ${{ env.DEPLOY_HOST }}
+          username: ${{ env.DEPLOY_USER }}
+          key: ${{ env.DEPLOY_SSH_KEY }}
           script: |
             set -e
-            cd ${{ secrets.DEPLOY_PATH || '/opt/bookstack' }}
-            aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}
+            cd ${{ env.DEPLOY_PATH || '/opt/bookstack' }}
+            aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin ${{ env.ECR_REGISTRY }}
             docker compose pull app
             docker compose up -d app
             docker image prune -f
