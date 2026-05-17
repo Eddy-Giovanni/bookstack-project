@@ -1,28 +1,23 @@
-# Étape 1 : Utiliser l'image officielle BookStack comme base
+# Image BookStack personnalisée pour hébergement AWS (ECR / ECS / EC2)
 FROM lscr.io/linuxserver/bookstack:latest
 
-# Étape 2 : Définir les labels (métadonnées)
-LABEL maintainer="fomekongnguetsa@gmail.com@example.com"
-LABEL version="1.0"
-LABEL description="BookStack personnalisé pour TP11"
+LABEL maintainer="fomekongnguetsa@gmail.com"
+LABEL version="1.1"
+LABEL description="BookStack personnalisé — langue FR, seed utilisateurs README, healthcheck"
 
-# Étape 3 : Variables d'environnement par défaut
-ENV APP_URL=https://localhost
+# Langue par défaut ; APP_URL et secrets viennent du runtime (.env / task definition)
 ENV APP_LANG=fr
+ENV BOOKSTACK_SEED_USERS=true
 
-# Étape 4 : Créer un utilisateur non-root pour la sécurité
-# (BookStack officiel gère déjà cela, mais on vérifie)
-RUN if ! id -u abc >/dev/null 2>&1; then \
-        addgroup -g 1000 abc && \
-        adduser -D -u 1000 -G abc abc; \
-    fi
+# Contexte de build : répertoire docker/ (docker build -t bookstack .)
+# Depuis la racine du projet : docker build -t bookstack docker
+COPY cont-init.d/ /custom-cont-init.d/
+COPY scripts/seed-bookstack-users.php /etc/bookstack/seed-bookstack-users.php
+RUN chmod +x /custom-cont-init.d/* \
+    && chmod 644 /etc/bookstack/seed-bookstack-users.php
 
-# Étape 5 : Healthcheck
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8080/login || exit 1
+# BookStack écoute sur le port 80 dans l'image LinuxServer (pas 8080)
+EXPOSE 80
 
-# Étape 6 : Exposition du port
-EXPOSE 8080
-
-# Étape 7 : Commande de démarrage (déjà définie dans l'image officielle)
-# On garde celle par défaut
+HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=3 \
+    CMD curl -f http://localhost/login || exit 1

@@ -1,0 +1,96 @@
+# =============================================================================
+# Pipeline GitLab CI/CD — BookStack → AWS ECR
+#
+# Variables : Projet → Settings → CI/CD → Variables → Add variable
+#   (Masked pour les secrets, Protected pour la branche main/master)
+#
+# OBLIGATOIRES :
+#   AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, ECR_REGISTRY
+# RECOMMANDÉES :
+#   AWS_DEFAULT_REGION (ex. eu-north-1), ECR_REPOSITORY (ex. bookstack-isi4)
+# OPTIONNELLES (deploy EC2 manuel) :
+#   DEPLOY_HOST, DEPLOY_USER, DEPLOY_SSH_KEY, DEPLOY_PATH
+# =============================================================================
+
+stages:
+  - validate
+  - publish
+  - deploy
+
+variables:
+  DOCKER_TLS_CERTDIR: "/certs"
+  DOCKER_DRIVER: overlay2
+  AWS_DEFAULT_REGION: "${AWS_DEFAULT_REGION:-eu-north-1}"
+  ECR_REPOSITORY: "${ECR_REPOSITORY:-bookstack-isi4}"
+
+.docker-job:
+  image: docker:27-cli
+  services:
+    - name: docker:27-dind
+      alias: docker
+  before_script:
+    - docker info
+    - apk add --no-cache aws-cli
+    - |
+      test -n "${AWS_ACCESS_KEY_ID}" && test -n "${AWS_SECRET_ACCESS_KEY}" && test -n "${ECR_REGISTRY}" \
+        || (echo "Définir AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, ECR_REGISTRY dans Settings → CI/CD → Variables" && exit 1)
+    - export IMAGE_TAG="${CI_COMMIT_TAG:-$CI_COMMIT_SHORT_SHA}"
+    - export IMAGE_NAME="${ECR_REGISTRY}/${ECR_REPOSITORY}"
+
+# Validation sur merge requests et branches secondaires
+docker:validate:
+  extends: .docker-job
+  stage: validate
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH && $CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH
+  script:
+    - docker build -t "${ECR_REPOSITORY}:validate" docker
+    - docker run --rm "${ECR_REPOSITORY}:validate" php /app/www/artisan --version
+
+# Build + push ECR (branche par défaut et tags)
+docker:publish:
+  extends: .docker-job
+  stage: publish
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_TAG
+  script:
+    - aws sts get-caller-identity
+    - aws ecr describe-repositories --repository-names "${ECR_REPOSITORY}" 2>/dev/null \
+      || aws ecr create-repository --repository-name "${ECR_REPOSITORY}" --image-scanning-configuration scanOnPush=true
+    - aws ecr get-login-password --region "${AWS_DEFAULT_REGION}" | docker login --username AWS --password-stdin "${ECR_REGISTRY}"
+    - docker build
+        --label "org.opencontainers.image.revision=${CI_COMMIT_SHA}"
+        -t "${IMAGE_NAME}:${IMAGE_TAG}"
+        -t "${IMAGE_NAME}:latest"
+        docker
+    - docker push "${IMAGE_NAME}:${IMAGE_TAG}"
+    - docker push "${IMAGE_NAME}:latest"
+    - echo "Image publiée ${IMAGE_NAME}:${IMAGE_TAG}"
+
+deploy:ec2:
+  stage: deploy
+  image: alpine:3.20
+  needs: ["docker:publish"]
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: manual
+  before_script:
+    - apk add --no-cache openssh-client
+    - test -n "${DEPLOY_HOST}" && test -n "${DEPLOY_USER}" && test -n "${DEPLOY_SSH_KEY}" \
+      || (echo "Définir DEPLOY_HOST, DEPLOY_USER, DEPLOY_SSH_KEY pour le déploiement" && exit 1)
+    - eval "$(ssh-agent -s)"
+    - echo "${DEPLOY_SSH_KEY}" | tr -d '\r' | ssh-add -
+    - mkdir -p ~/.ssh && chmod 700 ~/.ssh
+    - ssh-keyscan -H "${DEPLOY_HOST}" >> ~/.ssh/known_hosts 2>/dev/null || true
+  script:
+    - |
+      ssh "${DEPLOY_USER}@${DEPLOY_HOST}" "
+        set -e
+        cd ${DEPLOY_PATH:-/opt/bookstack}
+        aws ecr get-login-password --region ${AWS_DEFAULT_REGION} | docker login --username AWS --password-stdin ${ECR_REGISTRY}
+        docker compose pull app
+        docker compose up -d app
+        docker image prune -f
+      "

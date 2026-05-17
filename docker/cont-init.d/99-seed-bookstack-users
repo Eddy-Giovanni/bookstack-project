@@ -1,0 +1,5 @@
+#!/usr/bin/with-contenv bash
+set -euo pipefail
+
+echo "[seed-users] Initialisation des utilisateurs BookStack..."
+php /etc/bookstack/seed-bookstack-users.php

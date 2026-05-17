@@ -2,19 +2,68 @@ name: Build and Push to ECR
 
 on:
   push:
-    branches: [master]
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
   workflow_dispatch:
+    inputs:
+      push_image:
+        description: "Pousser l'image vers ECR (sinon build seul)"
+        type: boolean
+        default: true
+
+concurrency:
+  group: bookstack-ecr-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
 
 env:
-  AWS_REGION: us-east-1
-  ECR_REPOSITORY: bookstack-isi4
-  IMAGE_TAG: ${{ github.sha }}
+  AWS_REGION: ${{ vars.AWS_REGION || 'eu-north-1' }}
+  ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY || 'bookstack-isi4' }}
 
 jobs:
+  # ---------------------------------------------------------------------------
+  # Build de validation (PR et branches)
+  # ---------------------------------------------------------------------------
+  validate-build:
+    name: Validate Docker build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image (no push)
+        uses: docker/build-push-action@v6
+        with:
+          context: docker
+          file: docker/Dockerfile
+          push: false
+          load: true
+          tags: bookstack:ci-validate
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Verify BookStack artisan
+        run: docker run --rm bookstack:ci-validate php /app/www/artisan --version
+
+  # ---------------------------------------------------------------------------
+  # Build + push ECR (branche principale, tags, workflow manuel)
+  # ---------------------------------------------------------------------------
   build-and-push:
     name: Build and Push Docker Image
     runs-on: ubuntu-latest
-    
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')) ||
+      startsWith(github.ref, 'refs/tags/')
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -27,44 +76,87 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Verify AWS credentials
-        run: |
-          echo "Testing AWS credentials..."
-          aws sts get-caller-identity
+        run: aws sts get-caller-identity
 
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Verify ECR repository exists
+      - name: Ensure ECR repository exists
         run: |
-          echo "Checking if ECR repository exists..."
-          aws ecr describe-repositories --repository-names ${{ env.ECR_REPOSITORY }} --region ${{ env.AWS_REGION }} || \
-          (echo "Repository does not exist, creating..." && \
-           aws ecr create-repository --repository-name ${{ env.ECR_REPOSITORY }} --region ${{ env.AWS_REGION }})
+          aws ecr describe-repositories \
+            --repository-names "${{ env.ECR_REPOSITORY }}" \
+            --region "${{ env.AWS_REGION }}" \
+          || aws ecr create-repository \
+            --repository-name "${{ env.ECR_REPOSITORY }}" \
+            --region "${{ env.AWS_REGION }}" \
+            --image-scanning-configuration scanOnPush=true
 
-      - name: Build Docker image
-        env:
-          ECR_REGISTRY: ${{ secrets.ECR_REGISTRY }}
-          FULL_IMAGE_NAME: ${{ secrets.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}
+      - name: Set image metadata
+        id: meta
         run: |
-          echo "Building Docker image..."
-          echo "Registry: ${ECR_REGISTRY}"
-          echo "Repository: ${{ env.ECR_REPOSITORY }}"
-          echo "Image tag: ${{ env.IMAGE_TAG }}"
-          docker build -f docker/Dockerfile.ci -t "${FULL_IMAGE_NAME}:${{ env.IMAGE_TAG }}" -t "${FULL_IMAGE_NAME}:latest" .
+          REGISTRY="${{ steps.login-ecr.outputs.registry }}"
+          if [ -z "${REGISTRY}" ]; then
+            REGISTRY="$(echo '${{ secrets.ECR_REGISTRY }}' | tr -d '[:space:]')"
+          fi
+          if [ -z "${REGISTRY}" ]; then
+            echo "::error::ECR_REGISTRY manquant (secret ou sortie login-ecr)"
+            exit 1
+          fi
+          TAG="${{ github.sha }}"
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            TAG="${{ github.ref_name }}"
+          fi
+          echo "registry=${REGISTRY}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "image=${REGISTRY}/${{ env.ECR_REPOSITORY }}" >> "$GITHUB_OUTPUT"
 
-      - name: Push to ECR
-        env:
-          FULL_IMAGE_NAME: ${{ secrets.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push
+        if: github.event_name != 'workflow_dispatch' || inputs.push_image != false
+        uses: docker/build-push-action@v6
+        with:
+          context: docker
+          file: docker/Dockerfile
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.tag }}
+            ${{ steps.meta.outputs.image }}:latest
+          labels: |
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Summary
         run: |
-          echo "Pushing image with tag ${{ env.IMAGE_TAG }}..."
-          docker push "${FULL_IMAGE_NAME}:${{ env.IMAGE_TAG }}"
-          echo "Pushing image with tag latest..."
-          docker push "${FULL_IMAGE_NAME}:latest"
+          echo "### Image ECR" >> "$GITHUB_STEP_SUMMARY"
+          echo "- \`${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.tag }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- \`${{ steps.meta.outputs.image }}:latest\`" >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Image digest
-        run: |
-          echo "Image successfully pushed to ECR"
-          echo "Repository: ${{ secrets.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}"
-          echo "Tags: ${{ env.IMAGE_TAG }}, latest"
+  # ---------------------------------------------------------------------------
+  # Déploiement SSH optionnel sur EC2
+  # ---------------------------------------------------------------------------
+  deploy-ec2:
+    name: Deploy to EC2
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    if: github.event_name == 'workflow_dispatch' && secrets.DEPLOY_HOST != ''
+    environment: production
 
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            set -e
+            cd ${{ secrets.DEPLOY_PATH || '/opt/bookstack' }}
+            aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}
+            docker compose pull app
+            docker compose up -d app
+            docker image prune -f

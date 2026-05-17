@@ -62,8 +62,8 @@ services:
   # ==========================================
   app:
     build:
-      context: .
-      dockerfile: docker/Dockerfile
+      context: docker
+      dockerfile: Dockerfile
     container_name: bookstack-app
     restart: unless-stopped
     environment:
@@ -88,6 +88,17 @@ services:
       MAIL_ENCRYPTION: ${MAIL_ENCRYPTION:-tls}
       MAIL_FROM_NAME: ${MAIL_FROM_NAME:-BookStack}
       MAIL_FROM_ADDRESS: ${MAIL_FROM_ADDRESS:-noreply@example.com}
+      # Seed utilisateurs README (désactiver en prod : BOOKSTACK_SEED_USERS=false)
+      BOOKSTACK_SEED_USERS: ${BOOKSTACK_SEED_USERS:-true}
+      BOOKSTACK_ADMIN_EMAIL: ${BOOKSTACK_ADMIN_EMAIL:-admin@admin.com}
+      BOOKSTACK_ADMIN_NAME: ${BOOKSTACK_ADMIN_NAME:-Admin}
+      BOOKSTACK_ADMIN_PASSWORD: ${BOOKSTACK_ADMIN_PASSWORD:-password}
+      BOOKSTACK_ADMIN2_EMAIL: ${BOOKSTACK_ADMIN2_EMAIL:-nguetsamiguel@gmail.com}
+      BOOKSTACK_ADMIN2_NAME: ${BOOKSTACK_ADMIN2_NAME:-Miguel Nguetsa}
+      BOOKSTACK_ADMIN2_PASSWORD: ${BOOKSTACK_ADMIN2_PASSWORD:-azerty12}
+      BOOKSTACK_READER_EMAIL: ${BOOKSTACK_READER_EMAIL:-lecteur@example.com}
+      BOOKSTACK_READER_NAME: ${BOOKSTACK_READER_NAME:-Lecteur Test}
+      BOOKSTACK_READER_PASSWORD: ${BOOKSTACK_READER_PASSWORD:-qwerty}
     volumes:
       - bookstack_uploads:/config/www/uploads
       - bookstack_storage:/config/www/storage
